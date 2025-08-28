@@ -12,7 +12,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // --- STATE VARIABLES ---
+  // State variables
   bool _coolerIsOn = true;
   double _targetTemperature = 5.0;
   double _currentTemperature = 7.4;
@@ -76,13 +76,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Widget _buildTemperatureCard() {
+  Widget _buildRiskCard() {
     return Container(
       padding: const EdgeInsets.all(24.0),
       decoration: BoxDecoration(
         color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(color: AppColors.borderColor, width: 2.0),
+        border: Border.all(color: _riskColor, width: 2.0),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
@@ -93,28 +93,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Column(
         children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.thermostat, color: AppColors.secondaryText),
-              SizedBox(width: 8),
-              Text('Current Cooler Temperature', 
-                style: TextStyle(fontSize: 16, color: AppColors.secondaryText)),
+              Icon(Icons.warning_amber_rounded, color: _riskColor, size: 28),
+              const SizedBox(width: 8),
+              Text(
+                'Spoilage Risk Level',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _riskColor
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
-            '${_currentTemperature.toStringAsFixed(1)}°C',
-            style: const TextStyle(
-              fontSize: 64, 
+            _riskLevel,
+            style: TextStyle(
+              fontSize: 36,
               fontWeight: FontWeight.bold,
-              color: AppColors.primaryText
+              color: _riskColor
             ),
-          ),
-          const Divider(height: 20),
-          Text(
-            'Target: ${_targetTemperature.toStringAsFixed(1)}°C',
-            style: const TextStyle(fontSize: 16, color: AppColors.secondaryText),
           ),
         ],
       ),
@@ -126,16 +127,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         Expanded(
           child: InfoCard(
-            title: 'Humidity',
-            value: '${_currentHumidity.toStringAsFixed(1)}%',
+            icon: Icons.thermostat,
+            title: 'Temperature',
+            value: '${_currentTemperature.toStringAsFixed(1)}°C',
+            subtitle: 'Target: ${_targetTemperature.toStringAsFixed(1)}°C',
           ),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: InfoCard(
-            title: 'Risk Level',
-            value: _riskLevel,
-            valueColor: _riskColor,
+            icon: Icons.water_drop,
+            title: 'Humidity',
+            value: '${_currentHumidity.toStringAsFixed(1)}%',
           ),
         ),
       ],
@@ -208,7 +211,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildTemperatureCard(),
+            _buildRiskCard(),
             const SizedBox(height: 24),
             _buildInfoRow(),
             const SizedBox(height: 24),
@@ -246,11 +249,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               onPressed: () {
-                // Stop the timers
                 _dataSimulatorTimer.cancel();
                 _tripStopwatch.stop();
 
-                // Create summary data
                 final summaryData = TripSummaryData(
                   tripId: 'TRIP-${DateTime.now().millisecondsSinceEpoch}',
                   duration: _elapsedTime,
@@ -263,14 +264,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 );
 
-                // Navigate to summary screen
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => TripSummaryScreen(summaryData: summaryData),
                   ),
                 ).then((_) {
-                  // Reset dashboard when returning
                   setState(() {
                     _tripStopwatch.reset();
                     _elapsedTime = '00:00:00';
@@ -291,14 +290,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class InfoCard extends StatelessWidget {
+  final IconData? icon;
   final String title;
   final String value;
+  final String? subtitle;
   final Color? valueColor;
 
   const InfoCard({
     super.key,
+    this.icon,
     required this.title,
     required this.value,
+    this.subtitle,
     this.valueColor,
   });
 
@@ -320,21 +323,40 @@ class InfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, 
-            style: const TextStyle(
-              fontSize: 14, 
-              color: AppColors.secondaryText
-            )
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, color: AppColors.secondaryText, size: 20),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.secondaryText
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Text(
             value,
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
               color: valueColor ?? AppColors.primaryText,
             ),
           ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle!,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.secondaryText,
+              ),
+            ),
+          ],
         ],
       ),
     );
