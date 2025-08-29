@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
 import 'select_produce_screen.dart';
-import 'trip_summary_screen.dart';  // Changed import
+import 'trip_summary_screen.dart'; 
 import '../theme/colors.dart';
 
 class MainScreen extends StatefulWidget {

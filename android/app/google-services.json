@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "388802963138",
+    "firebase_url": "https://dal-ani-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "dal-ani",
+    "storage_bucket": "dal-ani.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:388802963138:android:5e8a489917dd01a9e0bd5b",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA0LLL3XBvewNJ-reemFqMpTJbmRVReSgI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

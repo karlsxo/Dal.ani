@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
 import '../theme/colors.dart';
 import 'trip_summary_screen.dart';
+import '../services/rtdb_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -15,42 +16,92 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // State variables
   bool _coolerIsOn = true;
   double _targetTemperature = 5.0;
-  double _currentTemperature = 7.4;
-  double _currentHumidity = 65.3;
-  String _riskLevel = "High Risk";
-  Color _riskColor = AppColors.highRisk;
-  late Timer _dataSimulatorTimer;
+  double _currentTemperature = 0.0;
+  double _currentHumidity = 0.0;
+  String _riskLevel = "Good";
+  Color _riskColor = AppColors.goodRisk;
+  bool _isLoading = true;
+
+  // Firebase database reference and subscription
+  final RTDBService _rtdbService = RTDBService();
+  late StreamSubscription<DatabaseEvent> _readingsSubscription;
+
   final Stopwatch _tripStopwatch = Stopwatch();
   String _elapsedTime = '00:00:00';
+
+  Timer? _durationTimer;
 
   @override
   void initState() {
     super.initState();
     _tripStopwatch.start();
-    _startDataSimulation();
+    _startTripDurationTimer();
+    _listenForSensorReadings(); // Start listening to Firebase
   }
 
   @override
   void dispose() {
-    _dataSimulatorTimer.cancel();
+    _readingsSubscription.cancel(); // Cancel the Firebase subscription
+    _durationTimer?.cancel();
     _tripStopwatch.stop();
     super.dispose();
   }
 
-  void _startDataSimulation() {
-    _dataSimulatorTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      setState(() {
-        final tempChange = (Random().nextDouble() - 0.5) * 0.5;
-        _currentTemperature += tempChange;
+  // Method to listen for the latest sensor data from Firebase
+  void _listenForSensorReadings() {
+    _readingsSubscription = _rtdbService.getSensorReadings().listen((event) {
+      if (!mounted) return;
 
-        final humidityChange = (Random().nextDouble() - 0.5) * 2;
-        _currentHumidity += humidityChange;
-        if (_currentHumidity < 30) _currentHumidity = 30;
-        if (_currentHumidity > 90) _currentHumidity = 90;
+      try {
+        final dataSnapshot = event.snapshot.value;
+        if (dataSnapshot == null) {
+          setState(() => _isLoading = false);
+          return;
+        }
 
-        _updateElapsedTime();
-        _updateRiskLevel();
-      });
+        if (dataSnapshot is Map) {
+          final latestReading = dataSnapshot.values.last;
+          if (latestReading is Map) {
+            setState(() {
+              _currentTemperature = double.parse(latestReading['temperature'].toString());
+              _currentHumidity = double.parse(latestReading['humidity'].toString());
+              _updateRiskLevel();
+              _isLoading = false;
+            });
+          }
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error processing sensor data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isLoading = false);
+      }
+    }, onError: (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error fetching sensor data: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() => _isLoading = false);
+    });
+  }
+
+  // This timer is just for the trip duration
+  void _startTripDurationTimer() {
+    _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_tripStopwatch.isRunning) {
+        setState(() {
+          _updateElapsedTime();
+        });
+      } else {
+        timer.cancel();
+      }
     });
   }
 
@@ -195,8 +246,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // When ending a trip, save the data
+  void _endTrip() async {
+    if (!mounted) return;
+    
+    _readingsSubscription.cancel();
+    _tripStopwatch.stop();
+
+    final tripData = {
+      'startTime': DateTime.now()
+          .subtract(Duration(seconds: _tripStopwatch.elapsed.inSeconds))
+          .toIso8601String(),
+      'endTime': DateTime.now().toIso8601String(),
+      'duration': _elapsedTime,
+      'avgTemperature': _currentTemperature,
+      'finalHumidity': _currentHumidity,
+      'riskLevel': _riskLevel,
+    };
+
+    try {
+      await _rtdbService.saveTripData(tripData);
+      // Navigate to summary screen
+      final summaryData = TripSummaryData(
+        tripId: 'TRIP-${DateTime.now().millisecondsSinceEpoch}',
+        duration: _elapsedTime,
+        avgTemperature: _currentTemperature,
+        warnings: _riskLevel == "High Risk" ? 1 : 0,
+        storageEfficiency: _riskLevel == "Good" ? 95 : 
+                          _riskLevel == "Low Risk" ? 80 : 60,
+        startTime: DateTime.now().subtract(
+          Duration(seconds: _tripStopwatch.elapsed.inSeconds)
+        ),
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TripSummaryScreen(summaryData: summaryData),
+        ),
+      ).then((_) {
+        setState(() {
+          _tripStopwatch.reset();
+          _elapsedTime = '00:00:00';
+          _listenForSensorReadings();
+        });
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving trip data: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: AppColors.lightGreenBackground,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primaryGreen,
+          ),
+        ),
+      );
+    }
+    
     return Scaffold(
       backgroundColor: AppColors.lightGreenBackground,
       appBar: AppBar(
@@ -248,35 +362,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   borderRadius: BorderRadius.circular(30),
                 ),
               ),
-              onPressed: () {
-                _dataSimulatorTimer.cancel();
-                _tripStopwatch.stop();
-
-                final summaryData = TripSummaryData(
-                  tripId: 'TRIP-${DateTime.now().millisecondsSinceEpoch}',
-                  duration: _elapsedTime,
-                  avgTemperature: _currentTemperature,
-                  warnings: _riskLevel == "High Risk" ? 1 : 0,
-                  storageEfficiency: _riskLevel == "Good" ? 95 : 
-                                   _riskLevel == "Low Risk" ? 80 : 60,
-                  startTime: DateTime.now().subtract(
-                    Duration(seconds: _tripStopwatch.elapsed.inSeconds)
-                  ),
-                );
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TripSummaryScreen(summaryData: summaryData),
-                  ),
-                ).then((_) {
-                  setState(() {
-                    _tripStopwatch.reset();
-                    _elapsedTime = '00:00:00';
-                    _startDataSimulation();
-                  });
-                });
-              },
+              onPressed: _endTrip,
               child: const Text(
                 'End Trip',
                 style: TextStyle(fontSize: 18, color: Colors.white),

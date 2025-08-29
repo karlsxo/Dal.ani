@@ -1,7 +1,6 @@
-// lib/screens/start_screen.dart
 import 'package:flutter/material.dart';
-import '../theme/colors.dart'; // Import your custom colors
-import 'main_screen.dart'; // Import the MainScreen to navigate to it
+import '../theme/colors.dart'; 
+import 'main_screen.dart'; 
 
 class StartScreen extends StatelessWidget {
   const StartScreen({super.key});
@@ -24,7 +23,7 @@ class StartScreen extends StatelessWidget {
               // ),
               // const SizedBox(height: 48),
 
-              Text(
+              const Text(
                 'Welcome to Dal-Ani App',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -34,7 +33,7 @@ class StartScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'Your intelligent companion for optimizing produce storage and minimizing waste.',
                 textAlign: TextAlign.center,
                 style: TextStyle(

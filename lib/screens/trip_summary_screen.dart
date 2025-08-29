@@ -163,7 +163,7 @@ class TripSummaryScreen extends StatelessWidget {
           title: 'Warnings',
           value: summaryData.warnings.toString(),
         ),
-        SummaryInfoCard(
+        const SummaryInfoCard(
           icon: Icons.check_circle_outline,
           title: 'Status',
           value: 'Fresh',

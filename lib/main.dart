@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';  // Add this import for kIsWeb
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'screens/start_screen.dart';
 import 'theme/colors.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Add platform check
+  if (!kIsWeb) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
+  
   runApp(const DalAniApp());
 }
 

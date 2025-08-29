@@ -1,9 +1,5 @@
-// lib/screens/select_produce.dart (assuming this is the correct filename)
 import 'package:flutter/material.dart';
 import '../theme/colors.dart'; // Corrected import path for colors.dart
-
-// Note: We need to pass data to the dashboard, which we'll set up later.
-// For now, this screen just shows the UI.
 
 class SelectProduceScreen extends StatelessWidget {
   const SelectProduceScreen({super.key});

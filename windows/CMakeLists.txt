@@ -1,16 +1,19 @@
 # Project-level configuration.
-cmake_minimum_required(VERSION 3.14)
-project(flutter_application_1 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.15)
+project(dal_ani LANGUAGES CXX)
 
-# The name of the executable created for the application. Change this to change
-# the on-disk name of your application.
-set(BINARY_NAME "flutter_application_1")
+set(BINARY_NAME "dal_ani")
+set(APPLICATION_ID "com.example.dal_ani")
 
-# Explicitly opt in to modern CMake behaviors to avoid warnings with recent
-# versions of CMake.
-cmake_policy(VERSION 3.14...3.25)
+cmake_policy(SET CMP0063 NEW)
+set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
 
-# Define build configuration option.
+# Enable debug symbols
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi")
+set(CMAKE_SHARED_LINKER_FLAGS_DEBUG "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /DEBUG:FULL /OPT:REF /OPT:ICF")
+
+# Configure build options.
 get_property(IS_MULTICONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(IS_MULTICONFIG)
   set(CMAKE_CONFIGURATION_TYPES "Debug;Profile;Release"
