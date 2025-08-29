@@ -1,12 +1,23 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'dart:math';
+
 import 'package:firebase_database/firebase_database.dart';
-import '../theme/colors.dart';
-import 'trip_summary_screen.dart';
+import 'package:flutter/material.dart';
+
 import '../services/rtdb_service.dart';
+import '../theme/colors.dart';
+import 'select_produce_screen.dart'; // Import the SelectProduceScreen
+import 'trip_summary_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final Map<String, dynamic>? selectedProduce; // Made optional
+  final double? initialTargetTemperature; // Made optional
+
+  const DashboardScreen({
+    super.key, 
+    this.selectedProduce,
+    this.initialTargetTemperature,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -15,33 +26,59 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   // State variables
   bool _coolerIsOn = true;
-  double _targetTemperature = 5.0;
+  late double _targetTemperature;
   double _currentTemperature = 0.0;
   double _currentHumidity = 0.0;
   String _riskLevel = "Good";
   Color _riskColor = AppColors.goodRisk;
   bool _isLoading = true;
 
-  // Firebase database reference and subscription
+  // Firebase and simulation related variables
   final RTDBService _rtdbService = RTDBService();
-  late StreamSubscription<DatabaseEvent> _readingsSubscription;
+  StreamSubscription<DatabaseEvent>? _readingsSubscription;
+  Timer? _dataSimulatorTimer;
+  bool _useSimulation = false; // Flag to determine data source
 
   final Stopwatch _tripStopwatch = Stopwatch();
   String _elapsedTime = '00:00:00';
-
   Timer? _durationTimer;
 
   @override
   void initState() {
     super.initState();
+    // Add navigation guard
+    if (widget.selectedProduce == null && widget.initialTargetTemperature == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const SelectProduceScreen()),
+        );
+      });
+      return;
+    }
+    
+    _targetTemperature = widget.initialTargetTemperature ?? 5.0;
     _tripStopwatch.start();
     _startTripDurationTimer();
-    _listenForSensorReadings(); // Start listening to Firebase
+    
+    // If no Firebase connection, fall back to simulation
+    _initializeDataSource();
+  }
+
+  void _initializeDataSource() {
+    try {
+      _listenForSensorReadings();
+    } catch (e) {
+      print('Firebase connection failed, falling back to simulation');
+      _useSimulation = true;
+      _startDataSimulation();
+    }
   }
 
   @override
   void dispose() {
-    _readingsSubscription.cancel(); // Cancel the Firebase subscription
+    _readingsSubscription?.cancel();
+    _dataSimulatorTimer?.cancel();
     _durationTimer?.cancel();
     _tripStopwatch.stop();
     super.dispose();
@@ -246,56 +283,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // Add simulation method from the second file
+  void _startDataSimulation() {
+    _isLoading = false;
+    _dataSimulatorTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (!mounted) return;
+      setState(() {
+        final tempChange = (Random().nextDouble() - 0.5) * 0.5;
+        _currentTemperature += tempChange;
+
+        final humidityChange = (Random().nextDouble() - 0.5) * 2;
+        _currentHumidity += humidityChange;
+        if (_currentHumidity < 30) _currentHumidity = 30;
+        if (_currentHumidity > 90) _currentHumidity = 90;
+
+        _updateElapsedTime();
+        _updateRiskLevel();
+      });
+    });
+  }
+
   // When ending a trip, save the data
   void _endTrip() async {
     if (!mounted) return;
     
-    _readingsSubscription.cancel();
+    _readingsSubscription?.cancel();
+    _dataSimulatorTimer?.cancel();
     _tripStopwatch.stop();
 
-    final tripData = {
-      'startTime': DateTime.now()
-          .subtract(Duration(seconds: _tripStopwatch.elapsed.inSeconds))
-          .toIso8601String(),
-      'endTime': DateTime.now().toIso8601String(),
-      'duration': _elapsedTime,
-      'avgTemperature': _currentTemperature,
-      'finalHumidity': _currentHumidity,
-      'riskLevel': _riskLevel,
-    };
+    if (!_useSimulation) {
+      final tripData = {
+        'startTime': DateTime.now()
+            .subtract(Duration(seconds: _tripStopwatch.elapsed.inSeconds))
+            .toIso8601String(),
+        'endTime': DateTime.now().toIso8601String(),
+        'duration': _elapsedTime,
+        'avgTemperature': _currentTemperature,
+        'finalHumidity': _currentHumidity,
+        'riskLevel': _riskLevel,
+      };
 
-    try {
-      await _rtdbService.saveTripData(tripData);
-      // Navigate to summary screen
-      final summaryData = TripSummaryData(
-        tripId: 'TRIP-${DateTime.now().millisecondsSinceEpoch}',
-        duration: _elapsedTime,
-        avgTemperature: _currentTemperature,
-        warnings: _riskLevel == "High Risk" ? 1 : 0,
-        storageEfficiency: _riskLevel == "Good" ? 95 : 
-                          _riskLevel == "Low Risk" ? 80 : 60,
-        startTime: DateTime.now().subtract(
-          Duration(seconds: _tripStopwatch.elapsed.inSeconds)
-        ),
-      );
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => TripSummaryScreen(summaryData: summaryData),
-        ),
-      ).then((_) {
-        setState(() {
-          _tripStopwatch.reset();
-          _elapsedTime = '00:00:00';
-          _listenForSensorReadings();
-        });
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving trip data: $e')),
-      );
+      try {
+        await _rtdbService.saveTripData(tripData);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving trip data: $e')),
+        );
+      }
     }
+
+    final summaryData = TripSummaryData(
+      tripId: 'TRIP-${DateTime.now().millisecondsSinceEpoch}',
+      duration: _elapsedTime,
+      avgTemperature: _currentTemperature,
+      warnings: _riskLevel == "High Risk" ? 1 : 0,
+      storageEfficiency: _riskLevel == "Good" ? 95 : 
+                        _riskLevel == "Low Risk" ? 80 : 60,
+      startTime: DateTime.now().subtract(
+        Duration(seconds: _tripStopwatch.elapsed.inSeconds)
+      ),
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TripSummaryScreen(summaryData: summaryData),
+      ),
+    ).then((_) {
+      setState(() {
+        _tripStopwatch.reset();
+        _elapsedTime = '00:00:00';
+        _initializeDataSource();
+      });
+    });
   }
 
   @override

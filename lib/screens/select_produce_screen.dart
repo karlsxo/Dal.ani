@@ -1,39 +1,62 @@
 import 'package:flutter/material.dart';
-import '../theme/colors.dart'; // Corrected import path for colors.dart
 
-class SelectProduceScreen extends StatelessWidget {
+import '../theme/colors.dart';
+import 'dashboard_screen.dart';
+
+class SelectProduceScreen extends StatefulWidget {
   const SelectProduceScreen({super.key});
 
   @override
+  State<SelectProduceScreen> createState() => _SelectProduceScreenState();
+}
+
+class _SelectProduceScreenState extends State<SelectProduceScreen> {
+  Map<String, dynamic>? selectedProduce;
+
+  @override
   Widget build(BuildContext context) {
-    // List of produce. You can add image paths here.
     final List<Map<String, dynamic>> produceList = [
-      {'name': 'Tomato', 'image': 'assets/tomato.png', 'temp': 13.0},
-      {'name': 'Eggplant', 'image': 'assets/eggplant.png', 'temp': 13.0},
-      {'name': 'Kamote', 'image': 'assets/kamote.png', 'temp': 13.0},
-      {'name': 'Mango', 'image': 'assets/mango.png', 'temp': 13.0},
+      {'name': 'Tomato/ Kamatis', 'image': 'assets/tomato.png', 'temp': 10.0},
+      {'name': 'Eggplant/ Tarong', 'image': 'assets/eggplant.png', 'temp': 12.0},
+      {'name': 'Sweet Potato/ Kamote', 'image': 'assets/kamote.png', 'temp': 16.0},
+      {'name': 'Mango/ Mangga', 'image': 'assets/mango.png', 'temp': 12.0},
+      {'name': 'Bok Choy/ Pechay', 'image': 'assets/pechay.png', 'temp': 4.0},
+      {'name': 'Cabbage', 'image': 'assets/cabbage.png', 'temp': 0.0},
+      {'name': 'Strawberry', 'image': 'assets/strawberry.png', 'temp': 2.0},
+      {'name': 'Banana/ Saging', 'image': 'assets/banana.png', 'temp': 12.0},
+      {'name': 'Lettuce', 'image': 'assets/lettuce.png', 'temp': 2.0},
+      {'name': 'Pineapple', 'image': 'assets/pineapple.png', 'temp': 12.0},
     ];
 
     return Scaffold(
+      backgroundColor: AppColors.lightGreenBackground,
       appBar: AppBar(
-        title: const Text('Start a New Trip', style: TextStyle(color: AppColors.darkText)),
+        title: const Text('Start a New Trip', 
+          style: TextStyle(color: AppColors.darkText)),
         backgroundColor: Colors.white,
         elevation: 1,
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
               'What are you storing today?',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primaryText),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primaryText
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
               'Please select produce to optimize cooling.',
-              style: TextStyle(fontSize: 16, color: AppColors.secondaryText),
+              style: TextStyle(
+                fontSize: 16,
+                color: AppColors.secondaryText
+              ),
             ),
             const SizedBox(height: 24),
             Expanded(
@@ -41,27 +64,54 @@ class SelectProduceScreen extends StatelessWidget {
                 itemCount: produceList.length,
                 itemBuilder: (context, index) {
                   final produce = produceList[index];
-                  // TODO: Create a state variable to track selection
+                  final bool isSelected = selectedProduce != null && 
+                                       selectedProduce!['name'] == produce['name'];
+                  
                   return ProduceListItem(
                     name: produce['name'],
                     temperature: produce['temp'],
-                    // imageAsset: produce['image'], // Add images to your project
+                    imageAsset: produce['image'],
+                    isSelected: isSelected,
                     onTap: () {
-                      print('${produce['name']} selected');
+                      setState(() {
+                        selectedProduce = produce;
+                      });
                     },
                   );
                 },
               ),
             ),
-            // TODO: Add "Custom Temperature" option
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
-              onPressed: () {
-                // TODO: Navigate to Dashboard and start the trip
-                print('Start Trip button pressed');
-              },
-              child: const Text('Start Trip'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(40),
+                ),
+                elevation: 5,
+              ),
+              onPressed: selectedProduce == null 
+                  ? null 
+                  : () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DashboardScreen(
+                            selectedProduce: selectedProduce,
+                            initialTargetTemperature: selectedProduce!['temp'],
+                          ),
+                        ),
+                      );
+                    },
+              child: const Text(
+                'Start Trip',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         ),
@@ -70,19 +120,20 @@ class SelectProduceScreen extends StatelessWidget {
   }
 }
 
-// A reusable widget for the produce list item
 class ProduceListItem extends StatelessWidget {
   final String name;
   final double temperature;
+  final String imageAsset;
+  final bool isSelected;
   final VoidCallback onTap;
-  // final String imageAsset; // Uncomment when you have images
 
   const ProduceListItem({
     super.key,
     required this.name,
     required this.temperature,
+    required this.imageAsset,
     required this.onTap,
-    // required this.imageAsset,
+    this.isSelected = false,
   });
 
   @override
@@ -92,17 +143,53 @@ class ProduceListItem extends StatelessWidget {
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        // TODO: Add border color change on selection
-        side: const BorderSide(color: Colors.transparent, width: 2),
       ),
-      child: ListTile(
+      color: isSelected ? AppColors.primaryGreen.withOpacity(0.1) : Colors.white,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
-        contentPadding: const EdgeInsets.all(12),
-        // leading: Image.asset(imageAsset, width: 50, height: 50),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        trailing: Text(
-          '${temperature.toStringAsFixed(0)}°C',
-          style: const TextStyle(fontSize: 16, color: AppColors.secondaryText),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: Row(
+            children: [
+              Image.asset(
+                imageAsset, 
+                width: 80,
+                height: 80,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: AppColors.primaryGreen,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${temperature.toStringAsFixed(0)}°C',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                const Icon(
+                  Icons.check_circle,
+                  color: AppColors.primaryGreen,
+                  size: 28,
+                ),
+            ],
+          ),
         ),
       ),
     );

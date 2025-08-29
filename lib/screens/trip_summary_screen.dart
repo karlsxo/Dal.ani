@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../theme/colors.dart';
 import 'main_screen.dart';
 
@@ -76,7 +77,6 @@ class TripSummaryScreen extends StatelessWidget {
                   ),
                 ),
                 onPressed: () {
-                  // Navigate back to MainScreen
                   Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (context) => const MainScreen()),

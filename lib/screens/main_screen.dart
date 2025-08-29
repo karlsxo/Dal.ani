@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'dashboard_screen.dart';
-import 'select_produce_screen.dart';
-import 'trip_summary_screen.dart'; 
+
 import '../theme/colors.dart';
+import 'select_produce_screen.dart';
+import 'trip_summary_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -24,11 +24,11 @@ class _MainScreenState extends State<MainScreen> {
     startTime: DateTime.now(),
   );
 
-  // Updated widget list to use TripSummaryScreen
+  // Updated widget list with proper initialization
   late final List<Widget> _widgetOptions = <Widget>[
-    const DashboardScreen(),
+    TripSummaryScreen(summaryData: dummyData), // Changed from DashboardScreen
     const SelectProduceScreen(),
-    TripSummaryScreen(summaryData: dummyData),  // Changed from TripHistoryScreen
+    TripSummaryScreen(summaryData: dummyData),
   ];
 
   void _onItemTapped(int index) {
@@ -56,9 +56,9 @@ class _MainScreenState extends State<MainScreen> {
             label: 'New Trip',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.summarize_outlined),  // Changed icon to be more appropriate
+            icon: Icon(Icons.summarize_outlined),
             activeIcon: Icon(Icons.summarize),
-            label: 'Summary',  // Changed label from 'History' to 'Summary'
+            label: 'Summary',
           ),
         ],
         currentIndex: _selectedIndex,
