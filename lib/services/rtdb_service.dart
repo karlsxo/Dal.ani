@@ -5,23 +5,24 @@ class RTDBService {
 
   Stream<DatabaseEvent> getSensorReadings() {
     try {
-      // Add debug print
-      print('Attempting to fetch sensor data from Firebase...');
-      
       return _database
           .child('readings')
-          .orderByKey()
+          .orderByChild('timestamp')
           .limitToLast(1)
           .onValue;
     } catch (e) {
-      print('Error in RTDBService: $e');
       throw Exception('Failed to get sensor readings: $e');
     }
   }
 
   Future<void> saveTripData(Map<String, dynamic> tripData) async {
     try {
-      await _database.child('trips').push().set(tripData);
+      final tripRef = _database.child('trips').push();
+      await tripRef.set({
+        ...tripData,
+        'id': tripRef.key,
+        'timestamp': ServerValue.timestamp,
+      });
     } catch (e) {
       throw Exception('Failed to save trip data: $e');
     }

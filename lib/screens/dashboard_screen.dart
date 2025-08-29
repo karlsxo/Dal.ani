@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:math';
-
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-
+import '../models/produce.dart';  // Add this import
 import '../services/rtdb_service.dart';
+import '../services/spoilage_tracker_service.dart';
+import '../constants/produce_data.dart';
 import '../theme/colors.dart';
-import 'select_produce_screen.dart'; // Import the SelectProduceScreen
+import 'select_produce_screen.dart';
 import 'trip_summary_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -29,12 +30,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late double _targetTemperature;
   double _currentTemperature = 0.0;
   double _currentHumidity = 0.0;
+  double _spoilagePercentage = 0;
   String _riskLevel = "Good";
   Color _riskColor = AppColors.goodRisk;
   bool _isLoading = true;
 
   // Firebase and simulation related variables
   final RTDBService _rtdbService = RTDBService();
+  final SpoilageTrackerService _spoilageTracker = SpoilageTrackerService();
   StreamSubscription<DatabaseEvent>? _readingsSubscription;
   Timer? _dataSimulatorTimer;
   bool _useSimulation = false; // Flag to determine data source
@@ -86,47 +89,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Method to listen for the latest sensor data from Firebase
   void _listenForSensorReadings() {
-    _readingsSubscription = _rtdbService.getSensorReadings().listen((event) {
-      if (!mounted) return;
-
-      try {
-        final dataSnapshot = event.snapshot.value;
-        if (dataSnapshot == null) {
-          setState(() => _isLoading = false);
-          return;
-        }
-
-        if (dataSnapshot is Map) {
-          final latestReading = dataSnapshot.values.last;
-          if (latestReading is Map) {
-            setState(() {
-              _currentTemperature = double.parse(latestReading['temperature'].toString());
-              _currentHumidity = double.parse(latestReading['humidity'].toString());
-              _updateRiskLevel();
-              _isLoading = false;
-            });
-          }
-        }
-      } catch (e) {
+    _readingsSubscription = _rtdbService.getSensorReadings().listen(
+      (event) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error processing sensor data: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+
+        try {
+          final dataSnapshot = event.snapshot.value;
+          if (dataSnapshot == null) {
+            print('No data available in snapshot');
+            setState(() => _isLoading = false);
+            return;
+          }
+
+          if (dataSnapshot is Map) {
+            final latestReading = dataSnapshot.values.last;
+            print('Latest reading: $latestReading');
+            
+            if (latestReading is Map) {
+              final temp = double.parse(latestReading['temperature'].toString());
+              final humidity = double.parse(latestReading['humidity'].toString());
+              
+              // Get the Produce object using the selected type
+              final Produce? produce = ProduceData.produces[widget.selectedProduce?['type']];
+              if (produce != null) {
+                _spoilageTracker.addReading(
+                  temp, 
+                  humidity, 
+                  DateTime.now(), 
+                  produce  // Pass the strongly typed Produce object
+                );
+                
+                setState(() {
+                  _currentTemperature = temp;
+                  _currentHumidity = humidity;
+                  _spoilagePercentage = _spoilageTracker.getSpoilagePercentage(produce);
+                  _isLoading = false;
+                });
+
+                _updateRiskLevel();
+              }
+            }
+          }
+        } catch (e) {
+          print('Error processing data: $e');
+          setState(() => _isLoading = false);
+        }
+      },
+      onError: (error) {
+        print('Stream error: $error');
         setState(() => _isLoading = false);
-      }
-    }, onError: (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error fetching sensor data: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      setState(() => _isLoading = false);
-    });
+      },
+    );
   }
 
   // This timer is just for the trip duration
@@ -151,61 +164,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _updateRiskLevel() {
-    final difference = (_currentTemperature - _targetTemperature).abs();
-    if (difference > 2.0) {
-      _riskLevel = "High Risk";
-      _riskColor = AppColors.highRisk;
-    } else if (difference > 1.0) {
-      _riskLevel = "Low Risk";
-      _riskColor = AppColors.lowRisk;
+    if (_spoilagePercentage >= 75) {
+      setState(() {
+        _riskLevel = "Critical Risk";
+        _riskColor = Colors.red;
+      });
+    } else if (_spoilagePercentage >= 50) {
+      setState(() {
+        _riskLevel = "High Risk";
+        _riskColor = Colors.orange;
+      });
+    } else if (_spoilagePercentage >= 25) {
+      setState(() {
+        _riskLevel = "Medium Risk";
+        _riskColor = Colors.yellow;
+      });
     } else {
-      _riskLevel = "Good";
-      _riskColor = AppColors.goodRisk;
+      setState(() {
+        _riskLevel = "Low Risk";
+        _riskColor = Colors.green;
+      });
     }
   }
 
   Widget _buildRiskCard() {
-    return Container(
-      padding: const EdgeInsets.all(24.0),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(color: _riskColor, width: 2.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 2,
-            blurRadius: 5,
-          )
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.warning_amber_rounded, color: _riskColor, size: 28),
-              const SizedBox(width: 8),
-              Text(
-                'Spoilage Risk Level',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: _riskColor
+    return Card(
+      elevation: 4,
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.warning_rounded, color: _riskColor),
+                const SizedBox(width: 8),
+                Text(
+                  'Risk Level',
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _riskLevel,
-            style: TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
-              color: _riskColor
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Text(
+              _riskLevel,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: _riskColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: _spoilagePercentage / 100,
+              backgroundColor: Colors.grey[200],
+              valueColor: AlwaysStoppedAnimation<Color>(_riskColor),
+              minHeight: 10,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Spoilage Risk: ${_spoilagePercentage.toStringAsFixed(1)}%',
+              style: TextStyle(color: _riskColor),
+            ),
+          ],
+        ),
       ),
     );
   }
