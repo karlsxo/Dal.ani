@@ -95,6 +95,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         try {
           final dataSnapshot = event.snapshot.value;
+          print('dataSnapshot: $dataSnapshot'); // <-- Add this line
+
           if (dataSnapshot == null) {
             print('No data available in snapshot');
             setState(() => _isLoading = false);
@@ -102,9 +104,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
 
           if (dataSnapshot is Map) {
-            final latestReading = dataSnapshot.values.last;
+            final latestReading = (dataSnapshot.values.toList().last);
             print('Latest reading: $latestReading');
-            
+
+            final humidity = latestReading['humidity'];
+            final temperature = latestReading['temperature'];
+            final timestamp = latestReading['timestamp'];
+            final gps = latestReading['gps'];
+            final gpsValid = gps != null ? gps['valid'] : null;
+
+            print('Humidity: $humidity, Temperature: $temperature, Timestamp: $timestamp, GPS valid: $gpsValid');
+            // Use these values in your UI
+
             if (latestReading is Map) {
               final temp = double.parse(latestReading['temperature'].toString());
               final humidity = double.parse(latestReading['humidity'].toString());
