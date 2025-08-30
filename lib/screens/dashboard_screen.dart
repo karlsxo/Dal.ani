@@ -5,16 +5,17 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 import '../constants/produce_data.dart';
-import '../models/produce.dart';  // Add this import
+import '../models/produce.dart';
 import '../services/rtdb_service.dart';
 import '../services/spoilage_tracker_service.dart';
 import '../theme/colors.dart';
+import 'main_screen.dart';
 import 'select_produce_screen.dart';
 import 'trip_summary_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  final Map<String, dynamic>? selectedProduce; // Made optional
-  final double? initialTargetTemperature; // Made optional
+  final Map<String, dynamic>? selectedProduce;
+  final double? initialTargetTemperature;
 
   const DashboardScreen({
     super.key, 
@@ -30,31 +31,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // State variables
   bool _coolerIsOn = true;
   late double _targetTemperature;
-  double _currentTemperature = 0.0;
-  double _currentHumidity = 0.0;
+  double _currentTemperature = 7.4;
+  double _currentHumidity = 7.4;
   double _spoilagePercentage = 0;
-  String _riskLevel = "Good";
-  Color _riskColor = AppColors.goodRisk;
-  bool _isLoading = true;
+  String _riskLevel = "High Risk";
+  Color _riskColor = Colors.red;
+  bool _isLoading = false;
 
   // Firebase and simulation related variables
   final RTDBService _rtdbService = RTDBService();
   final SpoilageTrackerService _spoilageTracker = SpoilageTrackerService();
   StreamSubscription<DatabaseEvent>? _readingsSubscription;
   Timer? _dataSimulatorTimer;
-  bool _useSimulation = false; // Flag to determine data source
+  bool _useSimulation = false;
 
   final Stopwatch _tripStopwatch = Stopwatch();
-  String _elapsedTime = '00:00:00';
+  String _elapsedTime = '2 hrs 5 mins';
   Timer? _durationTimer;
 
   @override
   void initState() {
     super.initState();
     
-    // Check if we have the required data
     if (widget.selectedProduce == null || widget.initialTargetTemperature == null) {
-      // Navigate back to select screen after the current build completes
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           Navigator.pushReplacement(
@@ -63,10 +62,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
       });
-      return; // Don't continue initialization
+      return;
     }
     
-    // Initialize normally if we have the required data
     _targetTemperature = widget.initialTargetTemperature!;
     _tripStopwatch.start();
     _startTripDurationTimer();
@@ -77,7 +75,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       _listenForSensorReadings();
       
-      // Add a timeout to fallback to simulation if no data comes within 10 seconds
       Timer(const Duration(seconds: 10), () {
         if (_isLoading && mounted) {
           print('No Firebase data received in 10 seconds, switching to simulation');
@@ -93,32 +90,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _readingsSubscription?.cancel();
-    _dataSimulatorTimer?.cancel();
-    _durationTimer?.cancel();
-    _tripStopwatch.stop();
-    super.dispose();
-  }
-
-  // Method to listen for the latest sensor data from Firebase
   void _listenForSensorReadings() {
-    print('Attempting to listen for Firebase sensor readings...');
-    
     _readingsSubscription = _rtdbService.getSensorReadings().listen(
       (event) {
         if (!mounted) return;
-        print('Received Firebase data event');
-        
-        // Mark that we got data from Firebase
-        if (_isLoading) {
-          print('Firebase data received, canceling simulation fallback');
-        }
 
         try {
           final dataSnapshot = event.snapshot.value;
-          print('dataSnapshot: $dataSnapshot'); // <-- Add this line
+          print('dataSnapshot: $dataSnapshot');
 
           if (dataSnapshot == null) {
             print('No data available in snapshot');
@@ -137,21 +116,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final gpsValid = gps != null ? gps['valid'] : null;
 
             print('Humidity: $humidity, Temperature: $temperature, Timestamp: $timestamp, GPS valid: $gpsValid');
-            // Use these values in your UI
 
             if (latestReading is Map) {
               final temp = double.parse(latestReading['temperature'].toString());
               final humidity = double.parse(latestReading['humidity'].toString());
               
-              // Get the Produce object using the selected type
               final Produce? produce = ProduceData.produces[widget.selectedProduce?['type']];
               if (produce != null) {
-                _spoilageTracker.addReading(
-                  temp, 
-                  humidity, 
-                  DateTime.now(), 
-                  produce  // Pass the strongly typed Produce object
-                );
+                _spoilageTracker.addReading(temp, humidity, DateTime.now(), produce);
                 
                 setState(() {
                   _currentTemperature = temp;
@@ -184,7 +156,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // This timer is just for the trip duration
   void _startTripDurationTimer() {
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_tripStopwatch.isRunning) {
@@ -199,10 +170,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _updateElapsedTime() {
     final duration = _tripStopwatch.elapsed;
-    _elapsedTime = 
-      '${duration.inHours.toString().padLeft(2, '0')}:'
-      '${(duration.inMinutes % 60).toString().padLeft(2, '0')}:'
-      '${(duration.inSeconds % 60).toString().padLeft(2, '0')}';
+    final hours = duration.inHours;
+    final minutes = (duration.inMinutes % 60);
+    _elapsedTime = '${hours} hrs ${minutes} mins';
   }
 
   void _updateRiskLevel() {
@@ -214,12 +184,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } else if (_spoilagePercentage >= 50) {
       setState(() {
         _riskLevel = "High Risk";
-        _riskColor = Colors.orange;
+        _riskColor = Colors.red;
       });
     } else if (_spoilagePercentage >= 25) {
       setState(() {
         _riskLevel = "Medium Risk";
-        _riskColor = Colors.yellow;
+        _riskColor = Colors.orange;
       });
     } else {
       setState(() {
@@ -229,142 +199,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Widget _buildRiskCard() {
-    return Card(
-      elevation: 4,
-      child: Container(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.warning_rounded, color: _riskColor),
-                const SizedBox(width: 8),
-                Text(
-                  'Risk Level',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _riskLevel,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: _riskColor,
-              ),
-            ),
-            const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: _spoilagePercentage / 100,
-              backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(_riskColor),
-              minHeight: 10,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Spoilage Risk: ${_spoilagePercentage.toStringAsFixed(1)}%',
-              style: TextStyle(color: _riskColor),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: InfoCard(
-            icon: Icons.thermostat,
-            title: 'Temperature',
-            value: '${_currentTemperature.toStringAsFixed(1)}°C',
-            subtitle: 'Target: ${_targetTemperature.toStringAsFixed(1)}°C',
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: InfoCard(
-            icon: Icons.water_drop,
-            title: 'Humidity',
-            value: '${_currentHumidity.toStringAsFixed(1)}%',
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildControls() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text('Cooler Status', 
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        Switch(
-          value: _coolerIsOn,
-          onChanged: (value) {
-            setState(() {
-              _coolerIsOn = value;
-            });
-          },
-          activeTrackColor: AppColors.primaryGreen.withOpacity(0.5),
-          activeThumbColor: AppColors.primaryGreen,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildManualTempAdjust() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.remove_circle, 
-            color: AppColors.primaryGreen, size: 40),
-          onPressed: () {
-            setState(() {
-              _targetTemperature -= 0.5;
-            });
-          },
-        ),
-        const SizedBox(width: 20),
-        const Text("Adjust Target", 
-          style: TextStyle(fontSize: 16, color: AppColors.secondaryText)),
-        const SizedBox(width: 20),
-        IconButton(
-          icon: const Icon(Icons.add_circle, 
-            color: AppColors.primaryGreen, size: 40),
-          onPressed: () {
-            setState(() {
-              _targetTemperature += 0.5;
-            });
-          },
-        ),
-      ],
-    );
-  }
-
-  // Add simulation method from the second file
   void _startDataSimulation() {
     print('Starting data simulation...');
     setState(() {
       _isLoading = false;
       _currentTemperature = _targetTemperature + (Random().nextDouble() - 0.5) * 4;
-      _currentHumidity = 60 + (Random().nextDouble() * 20); // 60-80%
+      _currentHumidity = 60 + (Random().nextDouble() * 20);
     });
     
     _dataSimulatorTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (!mounted) return;
       
       setState(() {
-        // Simulate realistic temperature fluctuations
         final tempChange = (Random().nextDouble() - 0.5) * 0.5;
         _currentTemperature += tempChange;
         
-        // Keep temperature within reasonable bounds
         if (_currentTemperature < _targetTemperature - 3) {
           _currentTemperature = _targetTemperature - 3;
         }
@@ -372,21 +221,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _currentTemperature = _targetTemperature + 3;
         }
 
-        // Simulate humidity changes
         final humidityChange = (Random().nextDouble() - 0.5) * 2;
         _currentHumidity += humidityChange;
         if (_currentHumidity < 30) _currentHumidity = 30;
         if (_currentHumidity > 90) _currentHumidity = 90;
 
-        // Update spoilage tracking
         final produce = ProduceData.produces[widget.selectedProduce?['type']];
         if (produce != null) {
-          _spoilageTracker.addReading(
-            _currentTemperature,
-            _currentHumidity,
-            DateTime.now(),
-            produce,
-          );
+          _spoilageTracker.addReading(_currentTemperature, _currentHumidity, DateTime.now(), produce);
           _spoilagePercentage = _spoilageTracker.getSpoilagePercentage(produce);
         }
 
@@ -395,34 +237,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  // When ending a trip, save the data
   void _endTrip() async {
     if (!mounted) return;
     
     _readingsSubscription?.cancel();
     _dataSimulatorTimer?.cancel();
     _tripStopwatch.stop();
-
-    if (!_useSimulation) {
-      final tripData = {
-        'startTime': DateTime.now()
-            .subtract(Duration(seconds: _tripStopwatch.elapsed.inSeconds))
-            .toIso8601String(),
-        'endTime': DateTime.now().toIso8601String(),
-        'duration': _elapsedTime,
-        'avgTemperature': _currentTemperature,
-        'finalHumidity': _currentHumidity,
-        'riskLevel': _riskLevel,
-      };
-
-      try {
-        await _rtdbService.saveTripData(tripData);
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving trip data: $e')),
-        );
-      }
-    }
 
     final summaryData = TripSummaryData(
       tripId: 'TRIP-${DateTime.now().millisecondsSinceEpoch}',
@@ -451,172 +271,399 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   @override
+  void dispose() {
+    _readingsSubscription?.cancel();
+    _dataSimulatorTimer?.cancel();
+    _durationTimer?.cancel();
+    _tripStopwatch.stop();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: AppColors.lightGreenBackground,
         body: Center(
-          child: CircularProgressIndicator(
-            color: AppColors.primaryGreen,
-          ),
+          child: CircularProgressIndicator(color: AppColors.primaryGreen),
         ),
       );
     }
-    
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 700;
+    final isVerySmallScreen = screenHeight < 600;
+    final isTinyScreen = screenHeight < 550;
+
     return Scaffold(
       backgroundColor: AppColors.lightGreenBackground,
-      appBar: AppBar(
-        title: const Text('Dal-Ani Monitor', 
-          style: TextStyle(color: AppColors.darkText)),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildRiskCard(),
-            const SizedBox(height: 24),
-            _buildInfoRow(),
-            const SizedBox(height: 24),
-            _buildControls(),
-            const Divider(height: 40),
-            Center(
-              child: Column(
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(isTinyScreen ? 6.0 : isVerySmallScreen ? 8.0 : isSmallScreen ? 10.0 : 12.0),
+          child: Column(
+            children: [
+              // Header
+              Text(
+                'Dal-ani Monitor',
+                style: TextStyle(
+                  fontSize: isTinyScreen ? 16 : isVerySmallScreen ? 18 : isSmallScreen ? 20 : 22,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryGreen,
+                ),
+              ),
+              Text(
+                widget.selectedProduce?['name'] ?? 'Tomatoes',
+                style: TextStyle(
+                  fontSize: isTinyScreen ? 12 : isSmallScreen ? 13 : 14,
+                  color: Colors.grey,
+                ),
+              ),
+              SizedBox(height: isTinyScreen ? 6 : isVerySmallScreen ? 8 : isSmallScreen ? 10 : 15),
+
+              // Risk Level Container
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(isTinyScreen ? 8 : isVerySmallScreen ? 10 : isSmallScreen ? 12 : 15),
+                decoration: BoxDecoration(
+                  color: _riskColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'Risk Level',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 12 : isSmallScreen ? 13 : 14,
+                      ),
+                    ),
+                    SizedBox(height: isTinyScreen ? 2 : 3),
+                    Text(
+                      _riskLevel,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isTinyScreen ? 16 : isVerySmallScreen ? 18 : isSmallScreen ? 20 : 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: isTinyScreen ? 6 : isVerySmallScreen ? 8 : isSmallScreen ? 10 : 15),
+
+              // Temperature and Humidity Cards
+              Row(
                 children: [
-                  const Text('TRIP DURATION', 
-                    style: TextStyle(
-                      color: AppColors.secondaryText, 
-                      letterSpacing: 1.5
-                    )
+                  // Temperature Card
+                  Expanded(
+                    child: Container(
+                      padding: EdgeInsets.all(isTinyScreen ? 6 : isVerySmallScreen ? 8 : isSmallScreen ? 10 : 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.1),
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.thermostat,
+                            size: isTinyScreen ? 20 : isVerySmallScreen ? 25 : isSmallScreen ? 28 : 32,
+                            color: AppColors.primaryGreen,
+                          ),
+                          SizedBox(height: isTinyScreen ? 3 : isSmallScreen ? 4 : 6),
+                          Text(
+                            'Temperature',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: isTinyScreen ? 9 : isVerySmallScreen ? 10 : isSmallScreen ? 11 : 12,
+                            ),
+                          ),
+                          SizedBox(height: isTinyScreen ? 1 : 2),
+                          Text(
+                            '${_currentTemperature.toStringAsFixed(1)}°C',
+                            style: TextStyle(
+                              fontSize: isTinyScreen ? 14 : isVerySmallScreen ? 16 : isSmallScreen ? 18 : 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.darkText,
+                            ),
+                          ),
+                          Text(
+                            'Target: ${_targetTemperature.toStringAsFixed(1)}°C',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: isTinyScreen ? 7 : isVerySmallScreen ? 8 : isSmallScreen ? 9 : 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(_elapsedTime, 
-                    style: const TextStyle(
-                      fontSize: 36, 
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.darkText
-                    )
+                  SizedBox(width: isTinyScreen ? 6 : isSmallScreen ? 8 : 10),
+                  // Humidity Card
+                  Expanded(
+                    child: Container(
+                      padding: EdgeInsets.all(isTinyScreen ? 6 : isVerySmallScreen ? 8 : isSmallScreen ? 10 : 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.1),
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.water_drop,
+                            size: isTinyScreen ? 20 : isVerySmallScreen ? 25 : isSmallScreen ? 28 : 32,
+                            color: AppColors.primaryGreen,
+                          ),
+                          SizedBox(height: isTinyScreen ? 3 : isSmallScreen ? 4 : 6),
+                          Text(
+                            'Humidity',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: isTinyScreen ? 9 : isVerySmallScreen ? 10 : isSmallScreen ? 11 : 12,
+                            ),
+                          ),
+                          SizedBox(height: isTinyScreen ? 1 : 2),
+                          Text(
+                            '${_currentHumidity.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: isTinyScreen ? 14 : isVerySmallScreen ? 16 : isSmallScreen ? 18 : 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.darkText,
+                            ),
+                          ),
+                          Text(
+                            'Current Level',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: isTinyScreen ? 7 : isVerySmallScreen ? 8 : isSmallScreen ? 9 : 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 24),
-            _buildManualTempAdjust(),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGreen,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(40),
+              SizedBox(height: isTinyScreen ? 5 : isVerySmallScreen ? 6 : isSmallScreen ? 8 : 12),
+
+              // Alert banner
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(isTinyScreen ? 6 : isVerySmallScreen ? 8 : isSmallScreen ? 10 : 12),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                elevation: 5,
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.white, size: isTinyScreen ? 14 : isSmallScreen ? 16 : 18),
+                    SizedBox(width: isTinyScreen ? 4 : isSmallScreen ? 6 : 8),
+                    Expanded(
+                      child: Text(
+                        'Cooler temperature too high, Check door',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isTinyScreen ? 9 : isVerySmallScreen ? 10 : isSmallScreen ? 11 : 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              onPressed: () {
-                Navigator.pushNamed(context, '/gps');
-              },
-              child: const Text(
-                "Open GPS Tracking",
-                style: TextStyle(
-                  fontSize: 18,
+              SizedBox(height: isTinyScreen ? 5 : isVerySmallScreen ? 6 : isSmallScreen ? 8 : 12),
+
+              // GPS Tracking Active
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTinyScreen ? 6 : isVerySmallScreen ? 8 : isSmallScreen ? 10 : 12,
+                  vertical: isTinyScreen ? 4 : isVerySmallScreen ? 6 : isSmallScreen ? 8 : 10,
+                ),
+                decoration: BoxDecoration(
                   color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.gps_fixed, size: isTinyScreen ? 14 : isSmallScreen ? 16 : 18, color: AppColors.primaryGreen),
+                        SizedBox(width: isTinyScreen ? 4 : isSmallScreen ? 6 : 8),
+                        Text(
+                          'GPS Tracking Active',
+                          style: TextStyle(fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 11 : isSmallScreen ? 12 : 14),
+                        ),
+                      ],
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        final mainScreenState = MainScreen.of(context);
+                        if (mainScreenState != null) {
+                          mainScreenState.switchToTab(2);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGreen,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isTinyScreen ? 6 : isVerySmallScreen ? 8 : isSmallScreen ? 10 : 12,
+                          vertical: isTinyScreen ? 2 : isVerySmallScreen ? 3 : isSmallScreen ? 4 : 6,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      child: Text(
+                        'View Maps',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isTinyScreen ? 8 : isVerySmallScreen ? 9 : isSmallScreen ? 10 : 11,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.highRisk,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
+              SizedBox(height: isTinyScreen ? 4 : isVerySmallScreen ? 5 : isSmallScreen ? 6 : 8),
+
+              // Cooler Status
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTinyScreen ? 6 : isVerySmallScreen ? 8 : isSmallScreen ? 10 : 12,
+                  vertical: isTinyScreen ? 4 : isVerySmallScreen ? 6 : isSmallScreen ? 8 : 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.ac_unit, size: isTinyScreen ? 14 : isSmallScreen ? 16 : 18, color: AppColors.primaryGreen),
+                        SizedBox(width: isTinyScreen ? 4 : isSmallScreen ? 6 : 8),
+                        Text(
+                          'Cooler Status',
+                          style: TextStyle(fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 11 : isSmallScreen ? 12 : 14),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Text('Off', style: TextStyle(color: Colors.grey, fontSize: isTinyScreen ? 9 : isSmallScreen ? 10 : 12)),
+                        SizedBox(width: isTinyScreen ? 2 : isSmallScreen ? 4 : 6),
+                        Transform.scale(
+                          scale: isTinyScreen ? 0.6 : isSmallScreen ? 0.7 : 0.8,
+                          child: Switch(
+                            value: _coolerIsOn,
+                            onChanged: (value) {
+                              setState(() {
+                                _coolerIsOn = value;
+                              });
+                            },
+                            activeColor: AppColors.primaryGreen,
+                          ),
+                        ),
+                        SizedBox(width: isTinyScreen ? 2 : isSmallScreen ? 4 : 6),
+                        Text('On', style: TextStyle(color: AppColors.primaryGreen, fontSize: isTinyScreen ? 9 : isSmallScreen ? 10 : 12)),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              onPressed: _endTrip,
-              child: const Text(
-                'End Trip',
-                style: TextStyle(fontSize: 18, color: Colors.white),
+              SizedBox(height: isTinyScreen ? 4 : isVerySmallScreen ? 5 : isSmallScreen ? 6 : 8),
+
+              // Duration
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTinyScreen ? 6 : isVerySmallScreen ? 8 : isSmallScreen ? 10 : 12,
+                  vertical: isTinyScreen ? 4 : isVerySmallScreen ? 6 : isSmallScreen ? 8 : 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time, size: isTinyScreen ? 14 : isSmallScreen ? 16 : 18, color: AppColors.primaryGreen),
+                    SizedBox(width: isTinyScreen ? 4 : isSmallScreen ? 6 : 8),
+                    Text(
+                      'Duration:',
+                      style: TextStyle(fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 11 : isSmallScreen ? 12 : 14),
+                    ),
+                    const Spacer(),
+                    Text(
+                      _elapsedTime,
+                      style: TextStyle(
+                        fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 11 : isSmallScreen ? 12 : 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+              const Spacer(),
 
-class InfoCard extends StatelessWidget {
-  final IconData? icon;
-  final String title;
-  final String value;
-  final String? subtitle;
-  final Color? valueColor;
-
-  const InfoCard({
-    super.key,
-    this.icon,
-    required this.title,
-    required this.value,
-    this.subtitle,
-    this.valueColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (icon != null) ...[
-                Icon(icon, color: AppColors.secondaryText, size: 20),
-                const SizedBox(width: 8),
-              ],
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.secondaryText
+              // End Trip Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _endTrip,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                    padding: EdgeInsets.symmetric(vertical: isTinyScreen ? 8 : isVerySmallScreen ? 10 : isSmallScreen ? 12 : 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  child: Text(
+                    'End Trip',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 14 : isSmallScreen ? 16 : 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: valueColor ?? AppColors.primaryText,
-            ),
-          ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              subtitle!,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.secondaryText,
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-
 import '../theme/colors.dart';
 import 'dashboard_screen.dart';
+import 'main_screen.dart';
 
 class SelectProduceScreen extends StatefulWidget {
   const SelectProduceScreen({super.key});
@@ -29,13 +29,8 @@ class _SelectProduceScreenState extends State<SelectProduceScreen> {
     ];
 
     return Scaffold(
-      backgroundColor: AppColors.lightGreenBackground,
       appBar: AppBar(
-        title: const Text('Start a New Trip', 
-          style: TextStyle(color: AppColors.darkText)),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        centerTitle: true,
+        title: const Text('Select Produce'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -94,14 +89,11 @@ class _SelectProduceScreenState extends State<SelectProduceScreen> {
               onPressed: selectedProduce == null 
                   ? null 
                   : () {
-                      // Add debug print to verify data
-                      print('Selected produce: $selectedProduce');
-                      print('Target temperature: ${selectedProduce!['temp']}');
-                      
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => DashboardScreen(
+                          builder: (context) => MainScreen( // Navigate to MainScreen
+                            initialIndex: 0, // Start on Dashboard tab
                             selectedProduce: {
                               'name': selectedProduce!['name'],
                               'type': selectedProduce!['name'].toLowerCase().replaceAll(' ', '_'),
