@@ -94,11 +94,19 @@ class _SelectProduceScreenState extends State<SelectProduceScreen> {
               onPressed: selectedProduce == null 
                   ? null 
                   : () {
+                      // Add debug print to verify data
+                      print('Selected produce: $selectedProduce');
+                      print('Target temperature: ${selectedProduce!['temp']}');
+                      
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
                           builder: (context) => DashboardScreen(
-                            selectedProduce: selectedProduce,
+                            selectedProduce: {
+                              'name': selectedProduce!['name'],
+                              'type': selectedProduce!['name'].toLowerCase().replaceAll(' ', '_'),
+                              'image': selectedProduce!['image'],
+                            },
                             initialTargetTemperature: selectedProduce!['temp'],
                           ),
                         ),

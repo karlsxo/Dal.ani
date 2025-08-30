@@ -51,30 +51,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Add navigation guard
-    if (widget.selectedProduce == null && widget.initialTargetTemperature == null) {
+    
+    // Check if we have the required data
+    if (widget.selectedProduce == null || widget.initialTargetTemperature == null) {
+      // Navigate back to select screen after the current build completes
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const SelectProduceScreen()),
-        );
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const SelectProduceScreen()),
+          );
+        }
       });
-      return;
+      return; // Don't continue initialization
     }
     
-    _targetTemperature = widget.initialTargetTemperature ?? 5.0;
+    // Initialize normally if we have the required data
+    _targetTemperature = widget.initialTargetTemperature!;
     _tripStopwatch.start();
     _startTripDurationTimer();
-    
-    // If no Firebase connection, fall back to simulation
     _initializeDataSource();
   }
 
   void _initializeDataSource() {
     try {
       _listenForSensorReadings();
+      
+      // Add a timeout to fallback to simulation if no data comes within 10 seconds
+      Timer(const Duration(seconds: 10), () {
+        if (_isLoading && mounted) {
+          print('No Firebase data received in 10 seconds, switching to simulation');
+          _readingsSubscription?.cancel();
+          _useSimulation = true;
+          _startDataSimulation();
+        }
+      });
     } catch (e) {
-      print('Firebase connection failed, falling back to simulation');
+      print('Firebase connection failed, falling back to simulation: $e');
       _useSimulation = true;
       _startDataSimulation();
     }
@@ -91,9 +104,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Method to listen for the latest sensor data from Firebase
   void _listenForSensorReadings() {
+    print('Attempting to listen for Firebase sensor readings...');
+    
     _readingsSubscription = _rtdbService.getSensorReadings().listen(
       (event) {
         if (!mounted) return;
+        print('Received Firebase data event');
+        
+        // Mark that we got data from Firebase
+        if (_isLoading) {
+          print('Firebase data received, canceling simulation fallback');
+        }
 
         try {
           final dataSnapshot = event.snapshot.value;
@@ -144,13 +165,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }
           }
         } catch (e) {
-          print('Error processing data: $e');
-          setState(() => _isLoading = false);
+          print('Error processing Firebase data: $e');
+          if (_isLoading) {
+            print('Falling back to simulation due to processing error');
+            _useSimulation = true;
+            _startDataSimulation();
+          }
         }
       },
       onError: (error) {
-        print('Stream error: $error');
-        setState(() => _isLoading = false);
+        print('Firebase stream error: $error');
+        if (_isLoading && mounted) {
+          print('Firebase stream failed, falling back to simulation');
+          _useSimulation = true;
+          _startDataSimulation();
+        }
       },
     );
   }
@@ -320,19 +349,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Add simulation method from the second file
   void _startDataSimulation() {
-    _isLoading = false;
+    print('Starting data simulation...');
+    setState(() {
+      _isLoading = false;
+      _currentTemperature = _targetTemperature + (Random().nextDouble() - 0.5) * 4;
+      _currentHumidity = 60 + (Random().nextDouble() * 20); // 60-80%
+    });
+    
     _dataSimulatorTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (!mounted) return;
+      
       setState(() {
+        // Simulate realistic temperature fluctuations
         final tempChange = (Random().nextDouble() - 0.5) * 0.5;
         _currentTemperature += tempChange;
+        
+        // Keep temperature within reasonable bounds
+        if (_currentTemperature < _targetTemperature - 3) {
+          _currentTemperature = _targetTemperature - 3;
+        }
+        if (_currentTemperature > _targetTemperature + 3) {
+          _currentTemperature = _targetTemperature + 3;
+        }
 
+        // Simulate humidity changes
         final humidityChange = (Random().nextDouble() - 0.5) * 2;
         _currentHumidity += humidityChange;
         if (_currentHumidity < 30) _currentHumidity = 30;
         if (_currentHumidity > 90) _currentHumidity = 90;
 
-        _updateElapsedTime();
+        // Update spoilage tracking
+        final produce = ProduceData.produces[widget.selectedProduce?['type']];
+        if (produce != null) {
+          _spoilageTracker.addReading(
+            _currentTemperature,
+            _currentHumidity,
+            DateTime.now(),
+            produce,
+          );
+          _spoilagePercentage = _spoilageTracker.getSpoilagePercentage(produce);
+        }
+
         _updateRiskLevel();
       });
     });
