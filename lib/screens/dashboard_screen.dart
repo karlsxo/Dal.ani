@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:math';
+
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+
+import '../constants/produce_data.dart';
 import '../models/produce.dart';  // Add this import
 import '../services/rtdb_service.dart';
 import '../services/spoilage_tracker_service.dart';
-import '../constants/produce_data.dart';
 import '../theme/colors.dart';
 import 'select_produce_screen.dart';
 import 'trip_summary_screen.dart';
@@ -436,6 +438,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 24),
             _buildManualTempAdjust(),
             const SizedBox(height: 32),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(40),
+                ),
+                elevation: 5,
+              ),
+              onPressed: () {
+                Navigator.pushNamed(context, '/gps');
+              },
+              child: const Text(
+                "Open GPS Tracking",
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.highRisk,
