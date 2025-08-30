@@ -153,10 +153,17 @@ class ProduceListItem extends StatelessWidget {
           child: Row(
             children: [
               Image.asset(
-                imageAsset, 
+                imageAsset,
                 width: 80,
                 height: 80,
                 fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(
+                    Icons.image_not_supported_outlined,
+                    size: 80,
+                    color: AppColors.secondaryText,
+                  );
+                },
               ),
               const SizedBox(width: 16),
               Expanded(

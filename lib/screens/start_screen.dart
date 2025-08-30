@@ -26,9 +26,9 @@ class StartScreen extends StatelessWidget {
                         height: 100,
                         errorBuilder: (context, error, stackTrace) {
                           return const Icon(
-                            Icons.error_outline,
-                            size: 150,
-                            color: Colors.red,
+                            Icons.eco_outlined, // Using a plant-related icon as placeholder
+                            size: 100,
+                            color: AppColors.primaryGreen,
                           );
                         },
                       ),
