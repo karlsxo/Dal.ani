@@ -1,30 +1,39 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class RTDBService {
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  static final RTDBService _instance = RTDBService._internal();
+  factory RTDBService() => _instance;
+  RTDBService._internal();
 
+  final DatabaseReference _database = FirebaseDatabase.instanceFor(
+    app: Firebase.app(), // Required parameter - use default Firebase app
+    databaseURL: 'https://dal-ani-default-rtdb.asia-southeast1.firebasedatabase.app',
+  ).ref();
+
+  // Get sensor readings from /sensorReadings path
   Stream<DatabaseEvent> getSensorReadings() {
-    try {
-      return _database
-          .child('readings')
-          .orderByChild('timestamp')
-          .limitToLast(1)
-          .onValue;
-    } catch (e) {
-      throw Exception('Failed to get sensor readings: $e');
-    }
+    print('🔥 RTDBService: Connecting to /sensorReadings...');
+    print('🔥 Database URL: https://dal-ani-default-rtdb.asia-southeast1.firebasedatabase.app');
+    
+    return _database.child('sensorReadings').onValue;
   }
 
-  Future<void> saveTripData(Map<String, dynamic> tripData) async {
+  // Test connection method
+  Future<void> testConnection() async {
     try {
-      final tripRef = _database.child('trips').push();
-      await tripRef.set({
-        ...tripData,
-        'id': tripRef.key,
-        'timestamp': ServerValue.timestamp,
-      });
+      print('🧪 Testing Firebase connection...');
+      final snapshot = await _database.child('sensorReadings').get();
+      print('✅ Connection successful!');
+      print('📊 Data exists: ${snapshot.exists}');
+      print('📊 Data value: ${snapshot.value}');
+      if (snapshot.value is Map) {
+        final data = snapshot.value as Map;
+        print('📊 Number of entries: ${data.length}');
+        print('📊 Keys: ${data.keys.toList()}');
+      }
     } catch (e) {
-      throw Exception('Failed to save trip data: $e');
+      print('❌ Connection failed: $e');
     }
   }
 }

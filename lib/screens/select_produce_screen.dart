@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
-import 'dashboard_screen.dart';
 import 'main_screen.dart';
 
 class SelectProduceScreen extends StatefulWidget {
@@ -16,21 +15,28 @@ class _SelectProduceScreenState extends State<SelectProduceScreen> {
   @override
   Widget build(BuildContext context) {
     final List<Map<String, dynamic>> produceList = [
-      {'name': 'Tomato/ Kamatis', 'image': 'assets/tomato.png', 'temp': 10.0},
-      {'name': 'Eggplant/ Tarong', 'image': 'assets/eggplant.png', 'temp': 12.0},
-      {'name': 'Sweet Potato/ Kamote', 'image': 'assets/kamote.png', 'temp': 16.0},
-      {'name': 'Mango/ Mangga', 'image': 'assets/mango.png', 'temp': 12.0},
-      {'name': 'Bok Choy/ Pechay', 'image': 'assets/pechay.png', 'temp': 4.0},
-      {'name': 'Cabbage', 'image': 'assets/cabbage.png', 'temp': 0.0},
-      {'name': 'Strawberry', 'image': 'assets/strawberry.png', 'temp': 2.0},
-      {'name': 'Banana/ Saging', 'image': 'assets/banana.png', 'temp': 12.0},
-      {'name': 'Lettuce', 'image': 'assets/lettuce.png', 'temp': 2.0},
-      {'name': 'Pineapple', 'image': 'assets/pineapple.png', 'temp': 12.0},
+      {'name': 'Tomato/ Kamatis', 'image': 'assets/tomato.png', 'temp': 10.0, 'type': 'tomatoes'},
+      {'name': 'Eggplant/ Tarong', 'image': 'assets/eggplant.png', 'temp': 12.0, 'type': 'eggplant'},
+      {'name': 'Sweet Potato/ Kamote', 'image': 'assets/kamote.png', 'temp': 16.0, 'type': 'sweet_potatoes'},
+      {'name': 'Mango/ Mangga', 'image': 'assets/mango.png', 'temp': 12.0, 'type': 'mangoes'},
+      {'name': 'Bok Choy/ Pechay', 'image': 'assets/pechay.png', 'temp': 4.0, 'type': 'bok_choy'},
+      {'name': 'Cabbage', 'image': 'assets/cabbage.png', 'temp': 0.0, 'type': 'cabbage'},
+      {'name': 'Strawberry', 'image': 'assets/strawberry.png', 'temp': 2.0, 'type': 'strawberries'},
+      {'name': 'Banana/ Saging', 'image': 'assets/banana.png', 'temp': 12.0, 'type': 'bananas'},
+      {'name': 'Lettuce', 'image': 'assets/lettuce.png', 'temp': 2.0, 'type': 'lettuce'},
+      {'name': 'Pineapple', 'image': 'assets/pineapple.png', 'temp': 12.0, 'type': 'pineapples'},
     ];
 
     return Scaffold(
+      backgroundColor: AppColors.lightGreenBackground,
       appBar: AppBar(
-        title: const Text('Select Produce'),
+        title: const Text(
+          'Select Produce',
+          style: TextStyle(color: AppColors.darkText),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 1,
+        centerTitle: true,
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -89,14 +95,19 @@ class _SelectProduceScreenState extends State<SelectProduceScreen> {
               onPressed: selectedProduce == null 
                   ? null 
                   : () {
+                      print('🔄 Selected produce: ${selectedProduce!['name']}');
+                      print('🔄 Target temperature: ${selectedProduce!['temp']}');
+                      print('🔄 Image path: ${selectedProduce!['image']}');
+                      print('🔄 Type: ${selectedProduce!['type']}');
+                      
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => MainScreen( // Navigate to MainScreen
+                          builder: (context) => MainScreen(
                             initialIndex: 0, // Start on Dashboard tab
                             selectedProduce: {
                               'name': selectedProduce!['name'],
-                              'type': selectedProduce!['name'].toLowerCase().replaceAll(' ', '_'),
+                              'type': selectedProduce!['type'], // Use the explicit type
                               'image': selectedProduce!['image'],
                             },
                             initialTargetTemperature: selectedProduce!['temp'],
@@ -104,12 +115,12 @@ class _SelectProduceScreenState extends State<SelectProduceScreen> {
                         ),
                       );
                     },
-              child: const Text(
-                'Start Trip',
+              child: Text(
+                selectedProduce == null ? 'Select a produce first' : 'Start Trip',
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: selectedProduce == null ? Colors.grey : Colors.white,
                 ),
               ),
             ),
@@ -143,6 +154,7 @@ class ProduceListItem extends StatelessWidget {
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
+        side: isSelected ? const BorderSide(color: AppColors.primaryGreen, width: 2) : BorderSide.none,
       ),
       color: isSelected ? AppColors.primaryGreen.withOpacity(0.1) : Colors.white,
       child: InkWell(
@@ -152,18 +164,29 @@ class ProduceListItem extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           child: Row(
             children: [
-              Image.asset(
-                imageAsset,
-                width: 80,
-                height: 80,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(
-                    Icons.image_not_supported_outlined,
-                    size: 80,
-                    color: AppColors.secondaryText,
-                  );
-                },
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  imageAsset,
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.image_not_supported_outlined,
+                        size: 40,
+                        color: AppColors.secondaryText,
+                      ),
+                    );
+                  },
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -172,15 +195,15 @@ class ProduceListItem extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
-                        color: AppColors.primaryGreen,
+                        color: isSelected ? AppColors.primaryGreen : AppColors.primaryText,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${temperature.toStringAsFixed(0)}°C',
+                      'Target: ${temperature.toStringAsFixed(1)}°C',
                       style: const TextStyle(
                         fontSize: 16,
                         color: Colors.blue,

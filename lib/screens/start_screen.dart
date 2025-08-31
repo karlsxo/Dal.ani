@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/colors.dart';
-import 'main_screen.dart';
+import 'select_produce_screen.dart'; // Changed from main_screen.dart
 
 class StartScreen extends StatelessWidget {
   const StartScreen({super.key});
@@ -61,7 +61,7 @@ class StartScreen extends StatelessWidget {
                   onPressed: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (context) => const MainScreen()),
+                      MaterialPageRoute(builder: (context) => const SelectProduceScreen()), // Changed to SelectProduceScreen
                     );
                   },
                   style: ElevatedButton.styleFrom(
